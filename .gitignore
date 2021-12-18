@@ -2,4 +2,6 @@ a.out
 *.o
 *~
 
+*.hi
+
 __pycache__
