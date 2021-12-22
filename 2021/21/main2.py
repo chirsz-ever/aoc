@@ -5,6 +5,7 @@ from typing import Union
 import sys
 import re
 from itertools import repeat, cycle
+import functools
 
 
 def getArg(n, default):
@@ -26,30 +27,37 @@ with open(inputFile) as fin:
             startPositons.append(int(m[2]))
             p += 1
 
-positions = startPositons.copy()
-scores = list(repeat(0, len(positions)))
+
+def step(p: int, d: int) -> int:
+    return (p + d - 1) % 10 + 1
 
 
-def dice(turn: int) -> int:
-    return turn % 100 + 1
+distrib: list[int] = [0 for _ in range(10)]
+
+distrib[3] = 1
+distrib[4] = 3
+distrib[5] = 6
+distrib[6] = 7
+distrib[7] = 6
+distrib[8] = 3
+distrib[9] = 1
 
 
-turn = 0
-winner = 0
-for p in cycle(range(len(positions))):
-    d1 = dice(turn)
-    turn += 1
-    d2 = dice(turn)
-    turn += 1
-    d3 = dice(turn)
-    turn += 1
-    positions[p] = (positions[p] + d1 + d2 + d3 - 1) % 10 + 1
-    scores[p] += positions[p]
-    # print(
-    #     f"Player {p+1} rolls {d1}+{d2}+{d3} and moves to space {positions[p]} for a total score of {scores[p]}"
-    # )
-    if scores[p] >= 1000:
-        winner = p
-        break
+@functools.cache
+def calcResults(myLeftScore: int, yourLeftScore: int, myPos: int, yourPos: int) -> tuple[int, int]:
+    if myLeftScore <= 0:
+        return (1, 0)
+    elif yourLeftScore <= 0:
+        return (0, 1)
+    r = [0, 0]
+    for d in range(3, 9 + 1):
+        myNewPos = step(myPos, d)
+        r1 = calcResults(yourLeftScore, myLeftScore - myNewPos, yourPos, myNewPos)
+        r = [r[0] + r1[1] * distrib[d], r[1] + r1[0] * distrib[d]]
+    return (r[0], r[1])
 
-print(f"{scores[(p+1)%2] * turn = }")
+
+r = calcResults(21, 21, startPositons[0], startPositons[1])
+
+print(f"{r}")
+print(f"most win universes: {max(r)}")
