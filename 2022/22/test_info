@@ -1,0 +1,7 @@
+up 0 <->  up 2
+up 1 --- left 0
+up 3 <->  right 1
+left 1  <-> down 3
+left 2  <-> down 1
+right 0 <-> right 2
+down 0  <-> down 2
