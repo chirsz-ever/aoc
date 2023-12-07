@@ -17,6 +17,7 @@ def parse_schematic() -> list[tuple[str, int, int]]:
     nums: list[tuple[str, int, int]] = []
     for r, row in enumerate(schematic):
         n = ''
+        start_col = 0
         for i, c in enumerate(row):
             if c.isdigit():
                 if n == '':
@@ -25,6 +26,9 @@ def parse_schematic() -> list[tuple[str, int, int]]:
             elif len(n) != 0:
                 nums.append((n, r, start_col))
                 n = ''
+        if len(n) != 0:
+            nums.append((n, r, start_col))
+            n = ''
     return nums
 
 def coords(row: int, start_col: int, l: int) -> Generator[tuple[int, int], None, None]:
