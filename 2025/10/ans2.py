@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.13"
+# dependencies = [
+#     "sympy>=1.4",
+# ]
+# ///
 
 import sys
-import math
+import sympy as sp
+from itertools import product
 
 def main() -> None:
     inputFile = 'input'
@@ -45,17 +52,16 @@ def main() -> None:
         s += answer
     print(f's = {s}')
 
-def is_match(jolt: list[int], schs: list[list[int]], choose: list[int]) -> bool:
-    d = [0] * len(jolt)
-    for i in range(len(schs)):
-        if choose[i]:
-            s = schs[i]
-            for l in s:
-                d[l] += 0 if choose[i] == -1 else choose[i]
-
-    result = d == jolt
-    # print(f'check {choose}: {result}')
-    return result
+def gauss_elimination(m: list[list[int]]) -> list[list[int]]:
+    m1 = sp.Matrix(m)
+    rref, pivots = m1.rref()
+    ds = { sp.fraction(x)[1] for x in rref }
+    # print(f'{ds=}')
+    if len(ds) > 1:
+        d = sp.ilcm(*ds)
+        print(f"{d=}")
+        rref *= d
+    return [[int(rref[i, j]) for j in range(rref.cols)] for i in range(rref.rows)]
 
 def combinations(max_jolt: int, size: int):
     if size == 1:
@@ -70,85 +76,95 @@ def combinations(max_jolt: int, size: int):
             cb.append(x0)
             yield cb
 
+def check_choose_valid(m: list[list[int]], choose: list[int|None]) -> bool:
+    for i in range(len(m)):
+        s = sum((choose[j] or 0) * m[i][j] for j in range(len(choose)))
+        if s > m[i][-1]:
+            return False
+    return True
 
-def find_answers(lights: list[int], schs: list[list[int]]) -> int:
-    min_answer = [math.inf]
-    must_min_answer = max(lights)
-    
-    sch_cnts = [0] * len(lights)
-    for i in range(0, len(lights)):
-        sch_cnts[i] = sum(1 if i in sch else 0 for sch in schs)
-    print(f'{sch_cnts=}')
-    
-    sorted_light_indexes = list(range(len(lights)))
-    sorted_light_indexes.sort(key = lambda i: (sch_cnts[i], lights[i]))
-    print(f'{sorted_light_indexes=}')
+def find_answers(target_jolts: list[int], schs: list[list[int]]) -> int:
+    raw_matrix = [ [ int(i in s) for s in schs ] + [target_jolts[i]] for i in range(len(target_jolts)) ]
+    # for r in matrix:
+    #     print(r)
+    m = gauss_elimination(raw_matrix)
+    rows = len(m)
+    cols = len(m[0])
+    assert rows == len(target_jolts)
+    assert cols == len(schs) + 1
+    for r in range(rows):
+        print(' ', m[r])
 
-    found = [False]
-    # check per light
-    def step(i, choose: list[int]) -> None:
-        if found[0]:
-            return
-        
-        # print(f'step {i=} {choose=}')
-        if i == len(lights):
-            # if is_match(lights, schs, choose):
-            min_answer[0] = min(min_answer[0], sum((c if c != -1 else 0) for c in choose))
-            if min_answer[0] == must_min_answer:
-                found[0] = True
-            return
+    min_answer = None
+    must_min_answer = max(target_jolts)
+    max_choose = max(target_jolts)
 
-        index = sorted_light_indexes[i]
-        target_jolt = lights[index]
+    found_last_row = False
+    last_row = None
+    last_col = None
+    for r in range(rows - 1, -1, -1):
+        for c in  range(0, cols):
+            if m[r][c] != 0:
+                found_last_row = True
+                last_row = r
+                last_col = c
+                break
+        if found_last_row:
+            break
+    assert found_last_row
+    assert last_row is not None and last_col is not None
+    assert last_row < cols - 1
 
-        schs_p = []
-        schs_np = []
-        for j, s in enumerate(schs):
-            if index in s:
-                if choose[j] == -1:
-                    schs_np.append(j)
-                else:
-                    schs_p.append(j)
+    if last_row == cols - 1:
+        return sum(row[-1] for row in m)
 
-        # print(f'{schs_p=} {schs_np=}')
-        pinned_jolt = sum((choose[j] if choose[j] != -1 else 0) for j in schs_p)
-        # print(f'{pinned_jolt=}')
+    free_variables: list[int] = [c for c in range(last_col + 1, cols - 1)]
+    last_first_col = last_col
+    for r in range(last_row - 1, -1, -1):
+        first_col = -1
+        row = m[r]
+        for c in range(0, cols):
+            if row[c] != 0:
+                first_col = c
+                break
+        free_variables += [c for c in range(first_col + 1, last_first_col)]
+        last_first_col = first_col
 
-        if pinned_jolt > target_jolt:
-            return
+    print(f'{free_variables=}')
+    # if len(free_variables) == 0:
+    #     min_answer = 
 
-        nps = len(schs_np)
-
-        if pinned_jolt == target_jolt:
-            new_choose = choose.copy()
-            for k in range(nps):
-                new_choose[k] = 0
-            step(i + 1, new_choose)
-            return
-
-        # pinned_jolt < target_jolt
-
-        if nps == 0:
-            return
-
-        avail = target_jolt - pinned_jolt
-        if nps == 1:
-            new_choose = choose.copy()
-            new_choose[schs_np[0]] = avail
-            step(i + 1, new_choose)
-        else:
-            if i == 0:
-                print(f'{i}: combinations({avail}, {nps})')
-            for comb in combinations(avail, nps):
-                new_choose = choose.copy()
-                for k, m in zip(schs_np, comb):
-                    new_choose[k] = m
-                step(i + 1, new_choose)
-                if found[0]:
-                    return
-
-    step(0, [-1] * len(schs))
-    return int(min_answer[0])
+    for pinned in product(range(0, max_choose), repeat=len(free_variables)):
+        choose = [0] * len(schs)
+        for i in range(len(free_variables)):
+            choose[free_variables[i]] = pinned[i]
+        good = True
+        for r in range(rows - 1, -1, -1):
+            row = m[r]
+            first_col = -1
+            for c in range(0, cols):
+                if row[c] != 0:
+                    first_col = c
+                    break
+            if first_col == -1:
+                continue
+            need = row[-1] - sum(choose[c] * row[c] for c in range(cols - 1))
+            first_v = row[first_col]
+            # print(f'{r=} {first_col=} {first_v=}')
+            if need % first_v != 0 or need // first_v < 0:
+                good = False
+                break
+            choose[first_col] = need // first_v
+        if good:
+            choose_sum = sum(choose)
+            if choose_sum == must_min_answer:
+                return must_min_answer
+            if min_answer is None:
+                min_answer = choose_sum
+            else:
+                min_answer = min(min_answer, choose_sum)
+    assert min_answer is not None
+    return min_answer
 
 if __name__ == '__main__':
     main()
