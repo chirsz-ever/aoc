@@ -165,9 +165,9 @@ def main() -> None:
                 continue
             # print(f"check overlap for {i} and {j}")
             if overlap_info := check_overlap(scanners[i], scanners[j]):
-                print(f"detect overlap in {i} and {j}")
+                # print(f"detect overlap in {i} and {j}")
                 merge_group(i, j, overlap_info, groups)
-                print(f"merge {i}, {j}, groups: {len(groups)}")
+                # print(f"merge {i}, {j}, groups: {len(groups)}")
 
     assert len(groups) == 1
     coords: set[Coord] = set()
@@ -199,6 +199,10 @@ def in_same_group(i: int, j: int, groups: list[ScannerGroup]) -> bool:
 
 # return how to transform s2 to s1
 def check_overlap(s1: Scanner, s2: Scanner) -> Transform | None:
+    distance_set1 = distance_set(s1)
+    distance_set2 = distance_set(s2)
+    if len(distance_set1.intersection(distance_set2)) < 66:
+        return None
     for b2 in s2.beacons:
         relative_coords2 = set(b - b2 for b in s2.beacons)
         for b1 in s1.beacons:
@@ -208,6 +212,17 @@ def check_overlap(s1: Scanner, s2: Scanner) -> Transform | None:
                 if len(relative_coords2_orient.intersection(relative_coords1)) >= 12:
                     offset = b1 - (orient @ b2)
                     return Transform(orient, offset)
+
+
+def distance_set(s: Scanner) -> set[int]:
+    ds: set[int] = set()
+    for i in range(len(s.beacons)):
+        for j in range(i + 1, len(s.beacons)):
+            b1 = s.beacons[i]
+            b2 = s.beacons[j]
+            d = (b1.x - b2.x) ** 2 + (b1.y - b2.y) ** 2 + (b1.z - b2.z) ** 2
+            ds.add(d)
+    return ds
 
 
 def merge_group(i: int, j: int, tji: Transform, groups: list[ScannerGroup]) -> None:
