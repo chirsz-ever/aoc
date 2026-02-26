@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+from typing import Iterable
 
 def main() -> None:
     inputFile = sys.argv[1]
